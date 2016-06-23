@@ -1,0 +1,53 @@
+{
+  "name": "tractram",
+  "version": "0.3.0",
+  "description": "Tracks trams' GPS location",
+  "main": "server.js",
+  "dependencies": {
+    "body-parser": "^1.15.0",
+    "browserify": "^13.0.1",
+    "connect-flash": "^0.1.1",
+    "cookie-parser": "^1.4.1",
+    "email-templates": "^2.1.0",
+    "express": "^4.13.3",
+    "express-session": "^1.13.0",
+    "kerberos": "0.0.17",
+    "mailgun-js": "^0.7.7",
+    "moment": "^2.12.0",
+    "mongodb": "^2.1.4",
+    "mongoose": "^4.3.5",
+    "node-jose": "^0.8.0",
+    "nunjucks": "^2.3.0",
+    "passport": "^0.3.2",
+    "passport-google-id-token": "^0.4.0",
+    "passport-google-oauth2": "^0.1.6",
+    "slug": "^0.9.1",
+    "socket.io": "^1.4.4"
+  },
+  "devDependencies": {
+    "chai": "^3.5.0",
+    "chai-http": "^2.0.1",
+    "mocha": "^2.5.3",
+    "supertest": "^1.2.0"
+  },
+  "scripts": {
+    "test": "mocha test.js",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tracman-org/server.git"
+  },
+  "keywords": [
+    "tracking",
+    "location",
+    "map"
+  ],
+  "author": "Keith Irwin",
+  "license": "MIT",
+  "README": "README.md",
+  "bugs": {
+    "url": "https://github.com/Tracman-org/Tractram/issues"
+  },
+  "homepage": "https://tractram.keithirwin.us"
+}

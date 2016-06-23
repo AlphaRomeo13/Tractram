@@ -1,0 +1,611 @@
+{% extends 'templates/base.html' %}
+{% block title %}{{super()}} | {{mapuser.name}}{% endblock %}
+
+{% block head %}
+	{{super()}}
+	<link href="/static/css/map.css" rel="stylesheet">
+	<style>
+		#notset {display:none}
+		.popup {
+			padding: 5vw;
+			border-radius: 5vw;
+			z-index: 100;
+			display: none;
+			position: absolute;
+			background: #222;
+			-moz-box-shadow: 3px 4px 6px #000;
+			-webkit-box-shadow: 3px 4px 6px #000;
+			box-shadow: 3px 4px 6px #000;
+			top: calc(60px + 5vw);
+			bottom: calc(30px + 5vw);
+			left:5vw; right: 5vw;
+			overflow-y: auto;
+			overflow-x: hidden;
+		}.popup .close {
+			position: relative;
+			top: -15px;
+			left: 10px;
+			float: right;
+		}.popup pre {
+			background: rgba(0,0,0,.5);
+			border: 1px solid #FFF;
+			padding: 1vw;
+		}.popup .btn {
+			background: #333;
+		}
+		
+		/*TODO: Smaller signs on mobile*/
+		/*.spd-sign {}*/
+		/*.alt-sign {}*/
+		
+		.wrap { top:{% if not noHeader %}58{% else %}0{% endif %}px;}
+		img#panoImg { width:100%; height:100%; }
+		
+		{% if mapuser.settings.showStreetview and disp!='0' and disp!='1' %}
+		/* show both */
+			@media (orientation: landscape) {
+					#map, #pano {
+						display:inline-block;
+						width:50%;
+						height:99%;
+					}2
+					#pano { float:right; }
+				}
+			@media (orientation: portrait) {
+				#map, #pano {
+					width:100%;
+					height:50%;
+				}
+				#pano { bottom:0; }
+		}
+		{% elif mapuser.settings.showStreetview and disp=='1' %}
+		/* show streetview */
+			#pano {
+				width:100%;
+				height:100%;}
+			#map {display: none}
+		{% else %}
+		/* show map */
+			#map {
+				width:100%;
+				height:100%;}
+			#pano {display: none}
+		{% endif %}
+	</style>
+{% endblock %}
+
+{% block main %}
+
+	{% if user %}
+		
+		<div class='share popup'>
+			<style>
+				.share.fa {
+					text-align: center;
+					width: 30px;
+					height: 30px;
+					border-radius: 50%;
+					padding-top: 7px;
+					background: rgba(255,255,255,.2);
+					-moz-box-shadow: 2px 2px 4px #000;
+					-webkit-box-shadow: 2px 2px 4px #000;
+					box-shadow: 2px 2px 4px #000;
+				}.share.fa:hover {
+					background: rgba(255,255,255,.4);
+				}.share.fa:active {
+					-moz-box-shadow: 0;
+					-webkit-box-shadow: 0;
+					box-shadow: 0;
+				}
+			</style>
+			<div class='close'>
+				<a href="#" title="close"><i class='fa fa-times'></i></a>
+			</div>
+			<h2>Share</h2>
+			<p>This link will display the map of your location: 
+			<a href="/map/{{user.slug}}">https://tracman.org/map/{{user.slug}}</a>
+			<br>Here are some buttons for your convienence: 
+				<a href="https://twitter.com/home?status=A%20map%20of%20my%20realtime%20location:%20https://tracman.org/map/{{user.slug}}" target="_blank"><i class="share fa fa-twitter"></i></a>
+	      <a href="https://www.facebook.com/sharer/sharer.php?u=https://tracman.org/map/{{user.slug}}" target="_blank"><i class="share fa fa-facebook"></i></a>
+	      <a href="https://www.reddit.com/submit?title=A%20map%20of%20my%20realtime%20location&url=https://tracman.org/map/{{user.slug}}" target="_blank"><i class="share fa fa-reddit-alien"></i></a>
+	      <a href="https://www.linkedin.com/shareArticle?mini=true&url=https://tracman.org/map/{{user.slug}}&title=A%20map%20of%20my%20realtime%20location" target="_blank"><i class="share fa fa-linkedin"></i></a>
+			</p>
+			
+			<p>You can also embed a map into your website with this code. Be sure to set the width and height attributes to suit your circumstance. 
+				<pre>&lt;iframe src=&quot;https://tracman.org/map/{{user.slug}}?noheader=1&quot; width=&quot;90%&quot; style=&quot;height:90vh&quot;&gt;&lt;/iframe&gt;</pre>
+			</p>
+			
+			<a href="#" class='btn' style="width:100%">OK</a>
+		</div>
+		
+		<div class='settings popup'>
+			<div class='close'>
+				<a href="#" title="close"><i class='fa fa-times'></i></a>
+			</div>
+			<h2>Settings</h2>
+			<script src="/static/js/validator.min.js"></script>
+			<form id='settings-form' class='col-lg-10 col-lg-offset-1 form-horizontal' data-toggle="validator" role="form" method="post">
+	
+				<div id='name'class='form-group' title="This appears in your page's title.  ">
+					<label class='control-label col-sm-2 col-lg-3' for="name">Name</label>
+					<div class='input-group col-xs-12 col-sm-10 col-lg-9'>
+						<input class='form-control' name="name" type="text" value="{{user.name}}"
+							maxlength="160" data-error="Invalid input"><br>
+					</div>
+					<div class='help-block with-errors col-xs-12 col-sm-10 col-sm-offset-2 col-lg-9 col-lg-offset-3'></div>
+				</div>
+				
+				<div id='slug'class='form-group' title="This is the URL which shows your location.  Be careful whom you share it with!  ">
+					<label class='control-label col-sm-2 col-lg-3' for="slug">URL</label>
+					<div class='input-group col-xs-12 col-sm-10 col-lg-9'>
+						<span class='input-group-addon'>tracman.org/map/</span>
+						<input class='form-control' type="text" name="slug" value="{{user.slug}}" required data-remote="/validate"
+							maxlength="160" data-remote-error="That URL is already taken.  " data-error="Invalid input"><br>
+					</div>
+					<div class='help-block with-errors col-xs-12 col-sm-10 col-sm-offset-2 col-lg-9 col-lg-offset-3'></div>
+				</div>
+	
+				<div id='units' class='form-group col-xs-12' title="Select imperial units for feet and miles/hour.  Select metric units if you are a commie.  ">
+					<label class='control-label col-sm-4 col-lg-3' for="units">Units</label>
+					<div class='input-group col-sm-8 col-lg-9'>
+						<div class='radio-inline'><label>
+							<input type="radio" name="units" value="imperial" {% if user.settings.units == 'imperial' %}checked{% endif %}>
+							Imperial
+						</label></div>
+						<div class='radio-inline'><label>
+							<input type="radio" name="units" value="metric" {% if user.settings.units == 'metric' %}checked{% endif %}>
+							Metric
+						</label></div>
+					</div>
+				</div>
+	
+				<div id='defaultMap' class='form-group col-xs-12' title="Shows whether to show a satellite image or standard google road map as the default on your page.  Visitors will have the option to change this.  Note that satellite images load slower.  ">
+					<label class='control-label col-sm-4 col-lg-3' for="map">Default map</label>
+					<div class='input-group col-sm-8 col-lg-9'>
+						<div class='radio-inline'><label>
+							<input type="radio" name="map" value="road" {% if user.settings.defaultMap == 'road' %}checked{% endif %}>
+							Road
+						</label></div>
+						<div class='radio-inline'><label>
+							<input type="radio" name="map" value="sat" {% if user.settings.defaultMap == 'sat' %}checked{% endif %}>
+							Satellite
+						</label></div>
+					</div>
+				</div>
+	
+				<div id='defaultZoom' class='form-group col-xs-12' title="Shows the initial map zoom level on your page.  A higher number means more zoom.  Note that the size of the viewing window will also have an effect on how much of the map a visitor can see.  ">
+					<label class='control-label col-xs-6 col-sm-4 col-lg-3' for="map">Default zoom</label>
+					<div class='input-group col-xs-6 col-sm-8 col-lg-9'>
+						<select class='c-select' name="zoom">
+							<option {% if user.settings.defaultZoom==1 %}selected {% endif %}value="1">1 World</option>
+							<option {% if user.settings.defaultZoom==2 %}selected {% endif %}value="2">2</option>
+							<option {% if user.settings.defaultZoom==3 %}selected {% endif %}value="3">3</option>
+							<option {% if user.settings.defaultZoom==4 %}selected {% endif %}value="4">4</option>
+							<option {% if user.settings.defaultZoom==5 %}selected {% endif %}value="5">5 Landmass</option>
+							<option {% if user.settings.defaultZoom==6 %}selected {% endif %}value="6">6</option>
+							<option {% if user.settings.defaultZoom==7 %}selected {% endif %}value="7">7</option>
+							<option {% if user.settings.defaultZoom==8 %}selected {% endif %}value="8">8</option>
+							<option {% if user.settings.defaultZoom==9 %}selected {% endif %}value="9">9</option>
+							<option {% if user.settings.defaultZoom==10 %}selected {% endif %}value="10">10 City</option>
+							<option {% if user.settings.defaultZoom==11 %}selected {% endif %}value="11">11</option>
+							<option {% if user.settings.defaultZoom==12 %}selected {% endif %}value="12">12</option>
+							<option {% if user.settings.defaultZoom==13 %}selected {% endif %}value="13">13</option>
+							<option {% if user.settings.defaultZoom==14 %}selected {% endif %}value="14">14</option>
+							<option {% if user.settings.defaultZoom==15 %}selected {% endif %}value="15">15 Streets</option>
+							<option {% if user.settings.defaultZoom==16 %}selected {% endif %}value="16">16</option>
+							<option {% if user.settings.defaultZoom==17 %}selected {% endif %}value="17">17</option>
+							<option {% if user.settings.defaultZoom==18 %}selected {% endif %}value="18">18</option>
+							<option {% if user.settings.defaultZoom==19 %}selected {% endif %}value="19">19</option>
+							<option {% if user.settings.defaultZoom==20 %}selected {% endif %}value="20">20 Buildings</option>
+						</select>
+					</div>
+				</div>
+				
+				<div id='showSpeed' class='form-group col-xs-12' title="{% if not user.isPro %}PRO ONLY! {% endif %}Shows a spedometer on the map.">
+					<label class='control-label col-xs-6 col-sm-4 col-lg-3' for="showSpeed">Show speed{% if not user.isPro %} <span class='red'>(PRO)</span>{% endif %}</label>
+					<div class='input-group col-xs-6 col-sm-8 col-lg-9'>
+						<input class='form-control' name="showSpeed" type="checkbox" {% if not user.isPro %}disabled {% elif user.settings.showSpeed %}checked{% else %}{% endif %}><br>
+					</div>
+				</div>
+	
+				<div id='showAltitude' class='form-group col-xs-12' title="{% if not user.isPro %}PRO ONLY! {% endif %}Shows the current elevation on the map. ">
+					<label class='control-label col-xs-6 col-sm-4 col-lg-3' for="showAlt">Show altitude{% if not user.isPro %} <span class='red'>(PRO)</span>{% endif %}</label>
+					<div class='input-group col-xs-6 col-sm-8 col-lg-9'>
+						<input class='form-control' name="showAlt" type="checkbox" {% if not user.isPro %}disabled {% elif user.settings.showAlt %}checked{% else %}{% endif %}><br>
+					</div>
+				</div>
+				
+				<div id='showStreet' class='form-group col-xs-12' title="{% if not user.isPro %}PRO ONLY! {% endif %}Shows a Google street view image at or near your current location, oriented in the direction of travel. ">
+					<label class='control-label col-xs-6 col-sm-4 col-lg-3' for="showStreet">Show street view{% if not user.isPro %} <span class='red'>(PRO)</span><br>{% endif %}</label>
+					<div class='input-group col-xs-6 col-sm-8 col-lg-9'>
+						<input class='form-control' name="showStreet" type="checkbox" {% if not user.isPro %}disabled{% elif user.settings.showStreetview %}checked{% else %}{% endif %}><br>
+					</div>
+				</div>
+	
+				<div id='submit' class='form-group col-xs-12 flexbox' style="padding:0 0 60px">
+					<input class='btn yellow' style="width:50%;" type="submit" value="Save">
+					<a href="#" class='btn' style="width:50%">cancel</a>
+				</div>
+			</form>
+			
+			{% if not user.isPro %}<p style="clear:both">Want to try <a href="/pro">Tracman Pro</a>? It's free during beta testing. </p>{% endif %}
+			<p style="clear:both">Would you like to submit a <a href="https://productpains.com/create/tracman">suggestion</a> or <a href="https://github.com/Tracman-org/Server/issues/new">bug report</a>? </p>
+		</div>
+		
+	{% endif %}
+
+	<div class='wrap'>
+	
+			<div id='map'><i class='loading fa fa-refresh fa-spin'></i></div>
+			<div id='pano'><i class='loading fa fa-refresh fa-spin'></i></div>
+			
+			<div id='notset' class='centered alert alert-warning'>
+				{% if user.id == mapuser.id %}
+					Your location is unset. You can click 'set' below to set it to your current position.
+				{% else %}
+					This user has no location set.  
+				{% endif %}
+			</div>
+		
+		{% if user.id == mapuser.id %}
+			<div id='controls'>
+			<style>
+				#controls {
+					width: 100vw;
+					position: absolute;
+					bottom: 50px;
+					display: flex;
+					justify-content: space-around;
+				}#controls .btn {
+					padding: 15px 0;
+					background: #222;
+					width: 30vw;
+				}#controls .btn:hover {
+					background: #333;
+				}#controls .track {
+					width:35vw;
+				}
+				{% if mapuser.settings.showStreetview and disp!='0' %}
+				@media (orientation: portrait) {
+					#controls { bottom:30px }
+				}
+				{% endif %}
+		</style>
+				<button class='btn set' onclick="setLocation()">Set</button>
+				<button class='btn track' onclick="trackLocation()" data-toggle="tooltop" title="Tracking location..." data-trigger="manual"><i class='fa fa-crosshairs'></i>&emsp;Track</button>
+				<button class='btn clear' onclick="clearLocation()">Clear</button>
+			</div>
+		{% endif %}
+		
+	</div>
+	
+	<script src="https://cdn.socket.io/socket.io-1.2.0.js"></script>
+	<script src="/static/js/bundle.js"></script>
+	<script src="https://maps.googleapis.com/maps/api/js?key={{api}}&callback=gmapsCb" async defer></script>
+	<script>
+		// Variables
+		{ var wpid, map, pano, sv, marker, elevator,
+			sock = io.connect(),
+			mapuserid = {{mapuser._id |dump|safe}},
+			userid{% if user._id %} = {{user._id |dump|safe}}{% endif %},
+			settings = JSON.parse('{{mapuser.settings |dump|safe}}'),
+			last = JSON.parse('{{mapuser.last |dump|safe}}'),
+			noHeader = {{noHeader |dump|safe}},
+			disp = {{disp |dump|safe}}, // 0=map, 1=streetview, 2=both
+			mapElem = document.getElementById('map'),
+			panoElem = document.getElementById('pano');
+		}
+		
+		// Connect to socket.io
+		sock.on('connect', function(){
+			sock.emit('room',
+				(userid)? 'app-'+userid :mapuserid
+			);
+		// }).on('data', function (data) {
+      // console.log(data);
+    }).on('error', function (err){
+      console.error('Unable to connect Socket.IO', err);
+    });
+      
+		// Check for location.hash capability (IE9+)
+		if (!'onhashchange' in window) {
+    	alert("location.hash won't work in IE<9. If you don't know how to fix this, google 'how to update browser'. ");
+		}
+		
+		// Parse location
+		function parseLoc(loc) {
+			loc.spd = (settings.units=='imperial')?parseFloat(loc.spd)*2.23694:parseFloat(loc.spd)
+			loc.dir = parseFloat(loc.dir);
+			loc.lat = parseFloat(loc.lat);
+			loc.lon = parseFloat(loc.lon);
+			loc.time = new Date(loc.time).toLocaleString()
+			loc.glatlng = new google.maps.LatLng(loc.lat, loc.lon);
+			return loc;
+		}
+		
+		// Show/hide map if location is set/unset
+		function toggleMaps(loc) {
+			if (loc.lat=='0'||loc.lon=='0') {
+				$('#map').hide();
+				$('#pano').hide();
+				$('#notset').show();
+			} else {
+				$('#map').show();
+				$('#pano').show();
+				$('#notset').hide();
+			}
+		}
+		// execute on page load
+		$(function() { if (last.time) {
+			toggleMaps(last);
+		} });
+		
+		// Google maps API callback
+		function gmapsCb() {
+			// Create map
+			if (disp!='1' || !settings.showStreetview) {
+				map = new google.maps.Map( mapElem, {
+					center: new google.maps.LatLng( last.lat, last.lon ),
+					panControl: false,
+					draggable: false,
+					zoom: settings.defaultZoom,
+					streetViewControl: false,
+					zoomControlOptions: {position: google.maps.ControlPosition.LEFT_TOP},
+					mapTypeId: (settings.defaultMap=='road')?google.maps.MapTypeId.ROADMAP:google.maps.MapTypeId.HYBRID
+				});
+				marker = new google.maps.Marker({
+					position: { lat:last.lat, lng:last.lon },
+					title: {{ mapuser.name | dump | safe }},
+					map: map,
+					draggable: false
+				});
+				map.addListener('zoom_changed',function(){
+					map.setCenter(marker.getPosition());
+				});
+				
+				// Create iFrame logo
+				if (noHeader.length) {
+					var logoDiv = document.createElement('div');
+					logoDiv.className = 'map-logo';
+					logoDiv.innerHTML = '<a href="https://tracman.org/">'+
+						'<img src="https://tracman.org/static/img/style/logo-28.png" alt="[]">'+
+						'Tracman</a>';
+					map.controls[google.maps.ControlPosition.BOTTOM_LEFT].push(logoDiv);
+				}
+				
+				// Create update time block
+				var timeDiv = document.createElement('div');
+				timeDiv.className = 'tim';
+				if (last.time) {
+					timeDiv.innerHTML = 'location updated '+new Date(last.time).toLocaleString();
+				}
+				map.controls[google.maps.ControlPosition.RIGHT_BOTTOM].push(timeDiv);
+				
+				// Create speed block
+				if (settings.showSpeed) {
+					var speedSign = document.createElement('div'),
+						speedLabel = document.createElement('div'),
+						speedText = document.createElement('div'),
+						speedUnit = document.createElement('div');
+					speedLabel.className = 'spd-label';
+					speedLabel.innerHTML = 'SPEED';
+					speedText.className = 'spd';
+					speedText.innerHTML = (settings.units=='imperial')?(parseFloat(last.spd)*2.23694).toFixed():last.spd.toFixed();
+					speedUnit.className = 'spd-unit';
+					speedUnit.innerHTML = (settings.units=='imperial')?'m.p.h.':'k.p.h.';
+					speedSign.className = 'spd-sign';
+					speedSign.appendChild(speedLabel);
+					speedSign.appendChild(speedText);
+					speedSign.appendChild(speedUnit);
+					map.controls[google.maps.ControlPosition.TOP_RIGHT].push(speedSign);
+				}
+				
+				// Create altitude block
+				if (settings.showAlt) {
+					var elevator = new google.maps.ElevationService;
+					var altitudeSign = document.createElement('div'),
+						altitudeLabel = document.createElement('div'),
+						altitudeText = document.createElement('div'),
+						altitudeUnit = document.createElement('div');
+					altitudeLabel.className = 'alt-label';
+					altitudeText.className = 'alt';
+					altitudeUnit.className = 'alt-unit';
+					altitudeSign.className = 'alt-sign';
+					altitudeText.innerHTML = '';
+					altitudeLabel.innerHTML = 'ALTITUDE';
+					getAltitude(new google.maps.LatLng(last.lat,last.lon), elevator, function(alt) {
+						if (alt) { altitudeText.innerHTML = (settings.units=='imperial')?(alt*3.28084).toFixed():alt.toFixed(); }
+					});
+					altitudeUnit.innerHTML = (settings.units=='imperial')?'feet above sea level':'meters above sea level';
+					altitudeSign.appendChild(altitudeLabel);
+					altitudeSign.appendChild(altitudeText);
+					altitudeSign.appendChild(altitudeUnit);
+					map.controls[google.maps.ControlPosition.TOP_RIGHT].push(altitudeSign);
+				}
+			}
+				
+			// Create streetview
+			updateStreetView(parseLoc(last),10);
+		}
+		
+		// Open popups
+		function setPopups() {
+			if (location.hash === "#share") {
+				$('.settings.popup').hide();
+				$('.share.popup').show();
+			} else if (location.hash === "#settings") {
+				$('.share.popup').hide();
+				$('.settings.popup').show();
+			} else {
+				$('.settings.popup').hide();
+				$('.share.popup').hide();
+			}
+		} setPopups(); // Execute immediately
+		window.onhashchange = setPopups; // Execute on change
+		
+		// Get location
+		sock.on('trac', function(loc) {
+			loc = parseLoc(loc);
+			if (disp!='1' || !settings.showStreetview) {
+				$('.tim').text('location updated '+loc.time);
+				if (settings.showSpeed) { $('.spd').text(loc.spd.toFixed()); }
+				if (settings.showAlt) {
+					getAltitude({lat:loc.lat,lng:loc.lon}, elevator, function(alt) {
+						if (alt) { $('.alt').text((settings.units=='imperial')?(alt*3.28084).toFixed():alt.toFixed()); }
+					});
+				}
+				toggleMaps(loc);
+				map.setCenter({lat:loc.lat,lng:loc.lon});
+				marker.setPosition({lat:loc.lat,lng:loc.lon});
+			}
+			updateStreetView(loc,10);
+		});
+		
+		{% if user %}
+			var token = '{{user.sk32}}';
+			
+			// Set location
+			function setLocation() {
+				if (!userid==mapuserid) {alert('You are not logged in! '); next();}
+				else {
+					if (!navigator.geolocation) {alert('Geolocation not enabled. ');}
+					else {
+						navigator.geolocation.getCurrentPosition(function(pos){
+							newloc = {
+								tok: token,
+								usr: userid,
+								lat: pos.coords.latitude,
+								lon: pos.coords.longitude,
+								spd: (pos.coords.speed||0)
+							}
+							sock.emit('app',newloc);
+							toggleMaps(newloc);
+						}, function(err) {
+							console.log('done getting position');
+							if (err) { console.log('ERROR: '+err); }
+						}, { enableHighAccuracy:true });
+					}
+				}
+			}
+			
+			// Track location
+			function trackLocation() {
+				if (!userid==mapuserid) { alert('You are not logged in! '); }
+				else {
+					// Stop tracking
+					if (wpid) {
+						$('#controls > .track').html('<i class="fa fa-crosshairs"></i>&emsp;Track').tooltip('hide');
+						navigator.geolocation.clearWatch(wpid);
+						wpid = undefined;
+					// Start tracking
+					} else {
+						$('#controls > .track').html('<i class="fa fa-crosshairs fa-spin"></i>&emsp;Stop').tooltip('show');
+						if (!navigator.geolocation) { alert('Unable to track location. '); }
+						else {
+							wpid = navigator.geolocation.watchPosition(function(pos) {
+								newloc = {
+									tok: token,
+									usr: '{{user.id}}',
+									lat: pos.coords.latitude,
+									lon: pos.coords.longitude,
+									spd: (pos.coords.speed||0)
+								};
+								sock.emit('app',newloc);
+								toggleMaps(newloc);
+							}, function(err){
+								alert('Failed to track: \n'+err);
+							}, { enableHighAccuracy:true });
+						}
+					}
+					}
+			}
+			
+			// Clear location
+			function clearLocation() {
+				if (!userid==mapuserid) { alert('You are not logged in! '); }
+				else {
+					// Stop tracking
+					if (wpid) {
+						$('#controls > .track').html('<i class="fa fa-crosshairs"></i>&emsp;Track').tooltip('hide');
+						navigator.geolocation.clearWatch(wpid);
+						wpid = undefined;
+					} 
+					newloc = {
+						tok: token,
+						usr: userid,
+						lat:0, lon:0, spd:0
+					}
+					sock.emit('app',newloc);
+					toggleMaps(newloc);
+				}
+			}
+			
+		{% endif %}
+		
+		// Check altitude
+		function getAltitude(loc,elev,cb){
+			elev = elev || new google.maps.ElevationService;
+			elev.getElevationForLocations({
+				'locations': [loc]
+			}, function(results, status) {
+				if (status === google.maps.ElevationStatus.OK && results[0]) {
+					cb(results[0].elevation);
+				}
+			});
+		}
+		
+		// Get street view imagery
+		function getStreetViewData(loc,rad,cb) {
+			if (!sv) { var sv=new google.maps.StreetViewService(); }
+			sv.getPanorama({location:{lat:loc.lat,lng:loc.lon},radius:rad},function(data,status){
+				if (status===google.maps.StreetViewStatus.ZERO_RESULTS){
+					getStreetViewData(loc,rad*2,cb);
+				} else if (status!==google.maps.StreetViewStatus.OK){ console.log('Street view not available: '+status); }
+				else { cb(data); }
+			});
+		}
+		
+		// Update streetview
+		function updateStreetView(loc) {
+			if (loc.spd>1) { // moving
+				if (settings.showStreetview && disp!='0') {
+					var imgElem = document.getElementById('panoImg');
+					getStreetViewData(loc, 50, function(data){
+						if (!imgElem) {
+							// Create image
+							pano = undefined;
+							$('#pano').empty();
+							$('#pano').append($('<img>',{
+								alt: 'Street view image',
+								src: 'https://maps.googleapis.com/maps/api/streetview?size=800x800&location='+loc.lat+','+loc.lon+'&fov=90&heading='+loc.dir+'&key={{api}}',
+								id: 'panoImg'
+							}));
+						}
+						// Set image
+						$('#panoImg').attr('src','https://maps.googleapis.com/maps/api/streetview?size='+$('#pano').width()+'x'+$('#pano').height()+'&location='+data.location.latLng.lat()+','+data.location.latLng.lng()+'&fov=90&heading='+loc.dir+'&key={{api}}');
+					});
+				}
+			} else if (pano==null) { // not moving and pano not set
+				getStreetViewData(loc, 50, function(data){
+					// Create panorama
+					$('#pano').empty();
+					var panoOptions = {
+						panControl: false,
+						zoomControl: false,
+						addressControl: false,
+						linksControl: false,
+					};
+					pano = new google.maps.StreetViewPanorama(panoElem, panoOptions);
+					// Set panorama
+					pano.setPano(data.location.pano);							
+					pano.setPov({
+						pitch: 0,
+						heading: Math.atan((loc.lon-data.location.latLng.lng())/(loc.lat-data.location.latLng.lat()))*(180/Math.PI)
+					});
+				});
+			}
+		}
+		
+	</script>
+	
+{% endblock %}
